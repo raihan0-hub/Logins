@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frozen Fridge Login</title>
+<style>
+  :root{
+    --ice-1:#eaffff;
+    --ice-2:#7fe9ff;
+    --ice-3:#00ddff;
+    --ice-4:#0a2540;
+    --dark-1:#07080a;
+    --dark-2:#111318;
+    --steel:#3a4048;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{
+    height:100%;
+    margin:0;
+    font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow:hidden;
+    background:var(--dark-1);
+  }
+
+  .stage{
+    position:relative;
+    width:100%;
+    height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:radial-gradient(circle at 50% 60%, #14161a 0%, #07080a 70%);
+    perspective:1600px;
+    transition:background 1.4s ease;
+  }
+
+  .stage.fridge-open{
+    background:radial-gradient(circle at 50% 55%, var(--ice-3) 0%, #0a2540 38%, #050a12 78%);
+  }
+
+  /* ---------- room ambience ---------- */
+  .floor-glow{
+    position:absolute;
+    bottom:0; left:0; right:0;
+    height:35%;
+    background:linear-gradient(to top, rgba(0,221,255,0.0), transparent);
+    opacity:0;
+    transition:opacity 1.6s ease;
+    pointer-events:none;
+  }
+  .stage.fridge-open .floor-glow{
+    opacity:1;
+    background:linear-gradient(to top, rgba(0,221,255,0.18), transparent);
+  }
+
+  /* ---------- fridge ---------- */
+  .fridge-wrap{
+    position:relative;
+    width:340px;
+    height:560px;
+    transform-style:preserve-3d;
+  }
+
+  .fridge-body{
+    position:absolute;
+    inset:0;
+    border-radius:14px;
+    background:linear-gradient(155deg,#4b5158 0%, #2c3036 55%, #1c1f24 100%);
+    box-shadow:
+      0 30px 60px rgba(0,0,0,0.55),
+      inset 0 0 0 2px rgba(255,255,255,0.03);
+    overflow:hidden;
+  }
+
+  .fridge-body::before{
+    /* seam between fridge and freezer */
+    content:"";
+    position:absolute;
+    top:38%;
+    left:0; right:0;
+    height:6px;
+    background:rgba(0,0,0,0.35);
+    box-shadow:0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .fridge-interior{
+    position:absolute;
+    inset:8px;
+    border-radius:8px;
+    background:radial-gradient(circle at 50% 40%, #0d3350 0%, #041325 70%, #01060d 100%);
+    box-shadow:inset 0 0 40px rgba(0,0,0,0.6);
+    overflow:hidden;
+  }
+
+  .interior-light{
+    position:absolute;
+    inset:0;
+    background:radial-gradient(circle at 50% 30%, rgba(140,235,255,0) 0%, rgba(140,235,255,0) 100%);
+    transition:background 1.1s ease 0.35s;
+  }
+  .stage.fridge-open .interior-light{
+    background:radial-gradient(circle at 50% 25%, rgba(180,245,255,0.95) 0%, rgba(0,180,255,0.35) 45%, rgba(0,60,110,0.05) 80%);
+  }
+
+  .interior-shelves{
+    position:absolute;
+    left:6%; right:6%;
+    height:2px;
+    background:rgba(255,255,255,0.12);
+  }
+  .shelf-1{top:32%;}
+  .shelf-2{top:58%;}
+  .shelf-3{top:82%;}
+
+  /* the door: rotates open on hinge at the left edge */
+  .fridge-door{
+    position:absolute;
+    inset:0;
+    border-radius:14px;
+    background:linear-gradient(160deg,#5a616a 0%, #363b41 55%, #24272c 100%);
+    transform-origin:left center;
+    transform:rotateY(0deg);
+    transition:transform 1.1s cubic-bezier(.4,.1,.2,1);
+    box-shadow:
+      inset 0 0 0 2px rgba(255,255,255,0.04),
+      2px 0 12px rgba(0,0,0,0.5);
+    cursor:pointer;
+    z-index:5;
+  }
+
+  .fridge-door::before{
+    /* subtle brushed panel highlight */
+    content:"";
+    position:absolute;
+    top:6%; bottom:6%; left:8%; right:8%;
+    border-radius:8px;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0) 40%);
+  }
+
+  .stage.fridge-open .fridge-door{
+    transform:rotateY(-112deg);
+  }
+
+  .door-handle{
+    position:absolute;
+    top:14%;
+    right:14px;
+    width:14px;
+    height:150px;
+    border-radius:8px;
+    background:linear-gradient(90deg,#cfd6dc,#8b939b 45%,#cfd6dc);
+    box-shadow:0 0 12px rgba(255,255,255,0.15), 0 4px 10px rgba(0,0,0,0.5);
+  }
+
+  .door-hint{
+    position:absolute;
+    bottom:-42px;
+    left:0; right:0;
+    text-align:center;
+    color:rgba(255,255,255,0.45);
+    font-size:13px;
+    letter-spacing:0.02em;
+    transition:opacity 0.6s ease;
+    pointer-events:none;
+  }
+  .stage.fridge-open .door-hint{opacity:0;}
+
+  /* ---------- frost overlay across whole screen ---------- */
+  .frost-overlay{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity 1.6s ease 0.2s;
+    background:
+      radial-gradient(circle at 8% 12%, rgba(255,255,255,0.5) 0%, transparent 6%),
+      radial-gradient(circle at 92% 18%, rgba(255,255,255,0.4) 0%, transparent 5%),
+      radial-gradient(circle at 15% 88%, rgba(255,255,255,0.45) 0%, transparent 7%),
+      radial-gradient(circle at 88% 85%, rgba(255,255,255,0.4) 0%, transparent 6%),
+      linear-gradient(180deg, rgba(200,240,255,0.06), rgba(200,240,255,0.02));
+    mix-blend-mode:screen;
+  }
+  .stage.fridge-open .frost-overlay{opacity:1;}
+
+  .frost-corner{
+    position:absolute;
+    width:220px;
+    height:220px;
+    opacity:0;
+    transition:opacity 1.4s ease 0.4s;
+    pointer-events:none;
+  }
+  .stage.fridge-open .frost-corner{opacity:0.55;}
+  .frost-corner svg{width:100%;height:100%;}
+  .fc-tl{top:-20px;left:-20px;}
+  .fc-br{bottom:-20px;right:-20px;transform:rotate(180deg);}
+
+  /* ---------- particles ---------- */
+  .particles{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    overflow:hidden;
+  }
+  .flake{
+    position:absolute;
+    top:-10px;
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:radial-gradient(circle, #fff, #9fe9ff 60%, transparent 70%);
+    opacity:0;
+    filter:drop-shadow(0 0 4px #aef3ff);
+  }
+  .stage.fridge-open .flake{
+    animation:fall linear infinite;
+    opacity:0.85;
+  }
+  @keyframes fall{
+    0%{transform:translateY(-5vh) translateX(0); opacity:0;}
+    10%{opacity:0.9;}
+    100%{transform:translateY(105vh) translateX(var(--drift,20px)); opacity:0;}
+  }
+
+  /* ---------- login card ---------- */
+  .login-wrap{
+    position:absolute;
+    top:0; left:0; right:0; bottom:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    z-index:10;
+  }
+
+  .login-card{
+    width:340px;
+    max-width:88vw;
+    padding:38px 32px 32px;
+    border-radius:20px;
+    background:rgba(255,255,255,0.05);
+    backdrop-filter:blur(15px) saturate(120%);
+    -webkit-backdrop-filter:blur(15px) saturate(120%);
+    border:1px solid rgba(173,216,230,0.25);
+    box-shadow:0 0 30px rgba(0,221,255,0.2), 0 20px 60px rgba(0,0,0,0.4);
+    opacity:0;
+    transform:scale(0.9) translateY(10px);
+    transition:opacity 0.9s ease 0.7s, transform 0.9s cubic-bezier(.2,.8,.3,1) 0.7s;
+  }
+  .stage.fridge-open .login-card{
+    opacity:1;
+    transform:scale(1) translateY(0);
+    pointer-events:auto;
+  }
+
+  .login-title{
+    margin:0 0 4px;
+    font-size:24px;
+    font-weight:600;
+    color:#eafcff;
+    text-shadow:0 0 8px rgba(0,221,255,0.6);
+    text-align:center;
+  }
+  .login-sub{
+    margin:0 0 26px;
+    text-align:center;
+    font-size:13px;
+    color:rgba(220,245,255,0.6);
+  }
+
+  .field{
+    margin-bottom:16px;
+  }
+  .field label{
+    display:block;
+    font-size:12px;
+    margin-bottom:6px;
+    color:rgba(210,240,255,0.75);
+  }
+  .field input{
+    width:100%;
+    padding:11px 14px;
+    border-radius:10px;
+    border:1px solid rgba(173,216,230,0.3);
+    background:rgba(255,255,255,0.04);
+    color:#eafeff;
+    font-size:14px;
+    outline:none;
+    transition:box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .field input::placeholder{color:rgba(200,235,245,0.35);}
+  .field input:focus{
+    border-color:#5fe0ff;
+    box-shadow:0 0 0 3px rgba(0,221,255,0.15), 0 0 12px rgba(0,221,255,0.35);
+  }
+
+  .login-btn{
+    width:100%;
+    margin-top:8px;
+    padding:12px 14px;
+    border:none;
+    border-radius:10px;
+    background:linear-gradient(135deg,#3fd8ff,#0091c7);
+    color:#04121a;
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:0.01em;
+    cursor:pointer;
+    text-shadow:0 0 8px rgba(255,255,255,0.25);
+    box-shadow:0 0 20px rgba(0,221,255,0.45);
+    transition:transform 0.15s ease, box-shadow 0.25s ease;
+  }
+  .login-btn:hover{
+    transform:translateY(-1px);
+    box-shadow:0 0 26px rgba(0,221,255,0.65);
+  }
+  .login-btn:active{transform:translateY(0);}
+
+  .login-foot{
+    margin-top:18px;
+    text-align:center;
+    font-size:12px;
+    color:rgba(200,235,245,0.55);
+  }
+  .login-foot a{
+    color:#8fe9ff;
+    text-decoration:none;
+  }
+  .login-foot a:hover{text-decoration:underline;}
+
+  @media (max-width:480px){
+    .fridge-wrap{width:250px;height:420px;}
+    .door-handle{width:10px;height:110px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .fridge-door, .login-card, .frost-overlay, .frost-corner, .interior-light{transition:none !important;}
+    .flake{animation:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+
+  <div class="floor-glow"></div>
+  <div class="frost-overlay"></div>
+
+  <div class="frost-corner fc-tl">
+    <svg viewBox="0 0 200 200"><path d="M0 0 L60 0 L20 20 L40 40 L15 65 L35 70 L10 95 L0 95 Z" fill="#dff6ff" opacity="0.7"/><path d="M0 0 L0 60 L20 20 L40 40 L65 15 L70 35 L95 10 L95 0 Z" fill="#dff6ff" opacity="0.5"/></svg>
+  </div>
+  <div class="frost-corner fc-br">
+    <svg viewBox="0 0 200 200"><path d="M0 0 L60 0 L20 20 L40 40 L15 65 L35 70 L10 95 L0 95 Z" fill="#dff6ff" opacity="0.7"/><path d="M0 0 L0 60 L20 20 L40 40 L65 15 L70 35 L95 10 L95 0 Z" fill="#dff6ff" opacity="0.5"/></svg>
+  </div>
+
+  <div class="particles" id="particles"></div>
+
+  <div class="fridge-wrap">
+    <div class="fridge-body">
+      <div class="fridge-interior">
+        <div class="interior-light"></div>
+        <div class="interior-shelves shelf-1"></div>
+        <div class="interior-shelves shelf-2"></div>
+        <div class="interior-shelves shelf-3"></div>
+      </div>
+    </div>
+    <div class="fridge-door" id="fridgeDoor">
+      <div class="door-handle"></div>
+      <div class="door-hint">click or drag the handle to open</div>
+    </div>
+  </div>
+
+  <div class="login-wrap">
+    <div class="login-card">
+      <h1 class="login-title">Frozen Fridge</h1>
+      <p class="login-sub">Sign in to keep it cool</p>
+      <form onsubmit="return false;">
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" type="text" placeholder="you@example.com" autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="login-btn" type="submit">Log in</button>
+      </form>
+      <p class="login-foot"><a href="#">Forgot password?</a></p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const stage = document.getElementById('stage');
+  const door = document.getElementById('fridgeDoor');
+  const particlesEl = document.getElementById('particles');
+
+  function openFridge(){
+    if(stage.classList.contains('fridge-open')) return;
+    stage.classList.add('fridge-open');
+    spawnFlakes();
+  }
+
+  function closeFridge(){
+    stage.classList.remove('fridge-open');
+    particlesEl.innerHTML = '';
+  }
+
+  door.addEventListener('click', () => {
+    if(stage.classList.contains('fridge-open')){
+      closeFridge();
+    } else {
+      openFridge();
+    }
+  });
+
+  // simple drag support: dragging the handle right-to-left opens it
+  let dragStartX = null;
+  door.addEventListener('pointerdown', (e) => { dragStartX = e.clientX; });
+  door.addEventListener('pointerup', (e) => {
+    if(dragStartX === null) return;
+    const dx = e.clientX - dragStartX;
+    dragStartX = null;
+    if(dx < -30){ openFridge(); }
+  });
+
+  function spawnFlakes(){
+    const count = window.innerWidth < 480 ? 18 : 32;
+    for(let i=0;i<count;i++){
+      const f = document.createElement('div');
+      f.className = 'flake';
+      const left = Math.random()*100;
+      const size = 3 + Math.random()*5;
+      const duration = 4 + Math.random()*5;
+      const delay = Math.random()*3;
+      const drift = (Math.random()*60-30) + 'px';
+      f.style.left = left+'vw';
+      f.style.width = size+'px';
+      f.style.height = size+'px';
+      f.style.setProperty('--drift', drift);
+      f.style.animationDuration = duration+'s';
+      f.style.animationDelay = delay+'s';
+      particlesEl.appendChild(f);
+    }
+  }
+</script>
+
+</body>
+</html>
